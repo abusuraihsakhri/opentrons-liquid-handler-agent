@@ -3,410 +3,159 @@ Enrichment Feature Implementation for opentrons-liquid-handler-agent.
 Generated based on domain-specific requirements in specifications.
 """
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 import datetime
-import math
-import json
+
+
+# =============================================================================
+# SHARED DATA STRUCTURES
+# =============================================================================
+@dataclass
+class EnrichmentResult:
+    """Unified result structure for all enrichment engine evaluations."""
+    feature_name: str = "Enrichment Engine"
+    status: str = "OPTIMAL"
+    score: float = 0.0
+    metrics: Dict[str, Any] = field(default_factory=dict)
+    alerts: List[str] = field(default_factory=list)
+    recommendations: List[str] = field(default_factory=list)
+    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+
+
+# =============================================================================
+# BASE ENGINE
+# =============================================================================
+class BaseEnrichmentEngine:
+    """
+    Base enrichment engine providing threshold-based evaluation.
+    Subclasses configure feature_name, threshold, and description.
+    """
+    feature_name: str = "Enrichment Engine"
+    description: str = "Domain enrichment evaluation engine."
+
+    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
+        self.threshold = threshold
+        self.config = config or {}
+        self.history: List[EnrichmentResult] = []
+
+    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> EnrichmentResult:
+        alerts = []
+        recs = []
+        status = "OPTIMAL"
+        score = round(float(primary_value), 3)
+
+        if primary_value > self.threshold * 2:
+            status = "CRITICAL_ALERT"
+            alerts.append(
+                f"{self.feature_name}: Primary value {primary_value:.2f} breached critical threshold "
+                f"({self.threshold * 2:.2f})"
+            )
+            recs.append("Initiate immediate protocol review and escalate to attending lead.")
+        elif primary_value > self.threshold:
+            status = "WARNING"
+            alerts.append(
+                f"{self.feature_name}: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})"
+            )
+            recs.append("Increase monitoring frequency and perform secondary verification.")
+        else:
+            recs.append("Parameters nominal under standard operating bounds.")
+
+        res = EnrichmentResult(
+            feature_name=self.feature_name,
+            status=status,
+            score=score,
+            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
+            alerts=alerts,
+            recommendations=recs,
+        )
+        self.history.append(res)
+        return res
+
 
 # =============================================================================
 # 1. PROTOCOL OPTIMIZATION & DEAD VOLUME MINIMIZATION
 # =============================================================================
-@dataclass
-class ProtocolOptimizationDeadVolumeMinimizationEngineResult:
-    feature_name: str = "Protocol Optimization & Dead Volume Minimization"
-    status: str = "OPTIMAL"
-    score: float = 0.0
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+class ProtocolOptimizationDeadVolumeMinimizationEngine(BaseEnrichmentEngine):
+    """Protocol Optimization & Dead Volume Minimization: Liquid class parameter optimization for accurate liquid transfers."""
+    feature_name = "Protocol Optimization & Dead Volume Minimization"
+    description = "Liquid class parameter optimization for accurate liquid transfers."
 
-class ProtocolOptimizationDeadVolumeMinimizationEngine:
-    """
-    Protocol Optimization & Dead Volume Minimization: **Description:** Liquid class parameter optimization for accurate liquid transfers.
-    """
-    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
-        self.threshold = threshold
-        self.config = config or {}
-        self.history: List[ProtocolOptimizationDeadVolumeMinimizationEngineResult] = []
-
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> ProtocolOptimizationDeadVolumeMinimizationEngineResult:
-        alerts = []
-        recs = []
-        status = "OPTIMAL"
-        score = round(float(primary_value), 3)
-
-        if primary_value > self.threshold * 2:
-            status = "CRITICAL_ALERT"
-            alerts.append(f"Protocol Optimization & Dead Volume Minimization: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
-            recs.append("Initiate immediate protocol review and escalate to attending lead.")
-        elif primary_value > self.threshold:
-            status = "WARNING"
-            alerts.append(f"Protocol Optimization & Dead Volume Minimization: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
-            recs.append("Increase monitoring frequency and perform secondary verification.")
-        else:
-            recs.append("Parameters nominal under standard operating bounds.")
-
-        res = ProtocolOptimizationDeadVolumeMinimizationEngineResult(
-            feature_name="Protocol Optimization & Dead Volume Minimization",
-            status=status,
-            score=score,
-            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
-            alerts=alerts,
-            recommendations=recs
-        )
-        self.history.append(res)
-        return res
 
 # =============================================================================
 # 2. AUTOMATED LABWARE DEFINITION & CUSTOM TIP HANDLING
 # =============================================================================
-@dataclass
-class AutomatedLabwareDefinitionCustomTipHandlingEngineResult:
-    feature_name: str = "Automated Labware Definition & Custom Tip Handling"
-    status: str = "OPTIMAL"
-    score: float = 0.0
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+class AutomatedLabwareDefinitionCustomTipHandlingEngine(BaseEnrichmentEngine):
+    """Automated Labware Definition & Custom Tip Handling: SBS-format labware definition generators for custom labware."""
+    feature_name = "Automated Labware Definition & Custom Tip Handling"
+    description = "SBS-format labware definition generators for custom labware."
 
-class AutomatedLabwareDefinitionCustomTipHandlingEngine:
-    """
-    Automated Labware Definition & Custom Tip Handling: **Description:** SBS-format labware definition generators for custom labware.
-    """
-    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
-        self.threshold = threshold
-        self.config = config or {}
-        self.history: List[AutomatedLabwareDefinitionCustomTipHandlingEngineResult] = []
-
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> AutomatedLabwareDefinitionCustomTipHandlingEngineResult:
-        alerts = []
-        recs = []
-        status = "OPTIMAL"
-        score = round(float(primary_value), 3)
-
-        if primary_value > self.threshold * 2:
-            status = "CRITICAL_ALERT"
-            alerts.append(f"Automated Labware Definition & Custom Tip Handling: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
-            recs.append("Initiate immediate protocol review and escalate to attending lead.")
-        elif primary_value > self.threshold:
-            status = "WARNING"
-            alerts.append(f"Automated Labware Definition & Custom Tip Handling: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
-            recs.append("Increase monitoring frequency and perform secondary verification.")
-        else:
-            recs.append("Parameters nominal under standard operating bounds.")
-
-        res = AutomatedLabwareDefinitionCustomTipHandlingEngineResult(
-            feature_name="Automated Labware Definition & Custom Tip Handling",
-            status=status,
-            score=score,
-            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
-            alerts=alerts,
-            recommendations=recs
-        )
-        self.history.append(res)
-        return res
 
 # =============================================================================
 # 3. TRACEABILITY & AUDIT TRAIL INTEGRATION
 # =============================================================================
-@dataclass
-class TraceabilityAuditTrailIntegrationEngineResult:
-    feature_name: str = "Traceability & Audit Trail Integration"
-    status: str = "OPTIMAL"
-    score: float = 0.0
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+class TraceabilityAuditTrailIntegrationEngine(BaseEnrichmentEngine):
+    """Traceability & Audit Trail Integration: 21 CFR Part 11-compliant records for automated liquid handling."""
+    feature_name = "Traceability & Audit Trail Integration"
+    description = "21 CFR Part 11-compliant records for automated liquid handling."
 
-class TraceabilityAuditTrailIntegrationEngine:
-    """
-    Traceability & Audit Trail Integration: **Description:** 21 CFR Part 11-compliant records for automated liquid handling.
-    """
-    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
-        self.threshold = threshold
-        self.config = config or {}
-        self.history: List[TraceabilityAuditTrailIntegrationEngineResult] = []
-
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> TraceabilityAuditTrailIntegrationEngineResult:
-        alerts = []
-        recs = []
-        status = "OPTIMAL"
-        score = round(float(primary_value), 3)
-
-        if primary_value > self.threshold * 2:
-            status = "CRITICAL_ALERT"
-            alerts.append(f"Traceability & Audit Trail Integration: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
-            recs.append("Initiate immediate protocol review and escalate to attending lead.")
-        elif primary_value > self.threshold:
-            status = "WARNING"
-            alerts.append(f"Traceability & Audit Trail Integration: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
-            recs.append("Increase monitoring frequency and perform secondary verification.")
-        else:
-            recs.append("Parameters nominal under standard operating bounds.")
-
-        res = TraceabilityAuditTrailIntegrationEngineResult(
-            feature_name="Traceability & Audit Trail Integration",
-            status=status,
-            score=score,
-            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
-            alerts=alerts,
-            recommendations=recs
-        )
-        self.history.append(res)
-        return res
 
 # =============================================================================
 # 4. PROTOCOL PARALLELIZATION & MULTIPLEXING
 # =============================================================================
-@dataclass
-class ProtocolParallelizationMultiplexingEngineResult:
-    feature_name: str = "Protocol Parallelization & Multiplexing"
-    status: str = "OPTIMAL"
-    score: float = 0.0
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+class ProtocolParallelizationMultiplexingEngine(BaseEnrichmentEngine):
+    """Protocol Parallelization & Multiplexing: Maximize throughput through asynchronous pipetting patterns."""
+    feature_name = "Protocol Parallelization & Multiplexing"
+    description = "Maximize throughput through asynchronous pipetting patterns."
 
-class ProtocolParallelizationMultiplexingEngine:
-    """
-    Protocol Parallelization & Multiplexing: **Description:** Maximize throughput through asynchronous pipetting patterns.
-    """
-    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
-        self.threshold = threshold
-        self.config = config or {}
-        self.history: List[ProtocolParallelizationMultiplexingEngineResult] = []
-
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> ProtocolParallelizationMultiplexingEngineResult:
-        alerts = []
-        recs = []
-        status = "OPTIMAL"
-        score = round(float(primary_value), 3)
-
-        if primary_value > self.threshold * 2:
-            status = "CRITICAL_ALERT"
-            alerts.append(f"Protocol Parallelization & Multiplexing: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
-            recs.append("Initiate immediate protocol review and escalate to attending lead.")
-        elif primary_value > self.threshold:
-            status = "WARNING"
-            alerts.append(f"Protocol Parallelization & Multiplexing: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
-            recs.append("Increase monitoring frequency and perform secondary verification.")
-        else:
-            recs.append("Parameters nominal under standard operating bounds.")
-
-        res = ProtocolParallelizationMultiplexingEngineResult(
-            feature_name="Protocol Parallelization & Multiplexing",
-            status=status,
-            score=score,
-            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
-            alerts=alerts,
-            recommendations=recs
-        )
-        self.history.append(res)
-        return res
 
 # =============================================================================
 # 5. ERROR RECOVERY & ROBUSTNESS TESTING
 # =============================================================================
-@dataclass
-class ErrorRecoveryRobustnessTestingEngineResult:
-    feature_name: str = "Error Recovery & Robustness Testing"
-    status: str = "OPTIMAL"
-    score: float = 0.0
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+class ErrorRecoveryRobustnessTestingEngine(BaseEnrichmentEngine):
+    """Error Recovery & Robustness Testing: Protocol failure mode analysis with automatic recovery strategies."""
+    feature_name = "Error Recovery & Robustness Testing"
+    description = "Protocol failure mode analysis with automatic recovery strategies."
 
-class ErrorRecoveryRobustnessTestingEngine:
-    """
-    Error Recovery & Robustness Testing: **Description:** Protocol failure mode analysis with automatic recovery strategies.
-    """
-    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
-        self.threshold = threshold
-        self.config = config or {}
-        self.history: List[ErrorRecoveryRobustnessTestingEngineResult] = []
-
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> ErrorRecoveryRobustnessTestingEngineResult:
-        alerts = []
-        recs = []
-        status = "OPTIMAL"
-        score = round(float(primary_value), 3)
-
-        if primary_value > self.threshold * 2:
-            status = "CRITICAL_ALERT"
-            alerts.append(f"Error Recovery & Robustness Testing: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
-            recs.append("Initiate immediate protocol review and escalate to attending lead.")
-        elif primary_value > self.threshold:
-            status = "WARNING"
-            alerts.append(f"Error Recovery & Robustness Testing: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
-            recs.append("Increase monitoring frequency and perform secondary verification.")
-        else:
-            recs.append("Parameters nominal under standard operating bounds.")
-
-        res = ErrorRecoveryRobustnessTestingEngineResult(
-            feature_name="Error Recovery & Robustness Testing",
-            status=status,
-            score=score,
-            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
-            alerts=alerts,
-            recommendations=recs
-        )
-        self.history.append(res)
-        return res
 
 # =============================================================================
 # 6. INTEGRATION WITH LIMS & SAMPLE MANAGEMENT
 # =============================================================================
-@dataclass
-class IntegrationWithLimsSampleManagementEngineResult:
-    feature_name: str = "Integration with LIMS & Sample Management"
-    status: str = "OPTIMAL"
-    score: float = 0.0
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+class IntegrationWithLimsSampleManagementEngine(BaseEnrichmentEngine):
+    """Integration with LIMS & Sample Management: LIMS import/export for worklist generation and sample tracking."""
+    feature_name = "Integration with LIMS & Sample Management"
+    description = "LIMS import/export for worklist generation and sample tracking."
 
-class IntegrationWithLimsSampleManagementEngine:
-    """
-    Integration with LIMS & Sample Management: **Description:** LIMS import/export for worklist generation and sample tracking.
-    """
-    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
-        self.threshold = threshold
-        self.config = config or {}
-        self.history: List[IntegrationWithLimsSampleManagementEngineResult] = []
-
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> IntegrationWithLimsSampleManagementEngineResult:
-        alerts = []
-        recs = []
-        status = "OPTIMAL"
-        score = round(float(primary_value), 3)
-
-        if primary_value > self.threshold * 2:
-            status = "CRITICAL_ALERT"
-            alerts.append(f"Integration with LIMS & Sample Management: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
-            recs.append("Initiate immediate protocol review and escalate to attending lead.")
-        elif primary_value > self.threshold:
-            status = "WARNING"
-            alerts.append(f"Integration with LIMS & Sample Management: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
-            recs.append("Increase monitoring frequency and perform secondary verification.")
-        else:
-            recs.append("Parameters nominal under standard operating bounds.")
-
-        res = IntegrationWithLimsSampleManagementEngineResult(
-            feature_name="Integration with LIMS & Sample Management",
-            status=status,
-            score=score,
-            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
-            alerts=alerts,
-            recommendations=recs
-        )
-        self.history.append(res)
-        return res
 
 # =============================================================================
 # 7. NORMALIZATION & DILUTION CALCULATOR
 # =============================================================================
-@dataclass
-class NormalizationDilutionCalculatorResult:
-    feature_name: str = "Normalization & Dilution Calculator"
-    status: str = "OPTIMAL"
-    score: float = 0.0
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+class NormalizationDilutionCalculator(BaseEnrichmentEngine):
+    """Normalization & Dilution Calculator: Automated dilution scheme generation for sample normalization."""
+    feature_name = "Normalization & Dilution Calculator"
+    description = "Automated dilution scheme generation for sample normalization."
 
-class NormalizationDilutionCalculator:
-    """
-    Normalization & Dilution Calculator: **Description:** Automated dilution scheme generation for sample normalization.
-    """
-    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
-        self.threshold = threshold
-        self.config = config or {}
-        self.history: List[NormalizationDilutionCalculatorResult] = []
-
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> NormalizationDilutionCalculatorResult:
-        alerts = []
-        recs = []
-        status = "OPTIMAL"
-        score = round(float(primary_value), 3)
-
-        if primary_value > self.threshold * 2:
-            status = "CRITICAL_ALERT"
-            alerts.append(f"Normalization & Dilution Calculator: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
-            recs.append("Initiate immediate protocol review and escalate to attending lead.")
-        elif primary_value > self.threshold:
-            status = "WARNING"
-            alerts.append(f"Normalization & Dilution Calculator: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
-            recs.append("Increase monitoring frequency and perform secondary verification.")
-        else:
-            recs.append("Parameters nominal under standard operating bounds.")
-
-        res = NormalizationDilutionCalculatorResult(
-            feature_name="Normalization & Dilution Calculator",
-            status=status,
-            score=score,
-            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
-            alerts=alerts,
-            recommendations=recs
-        )
-        self.history.append(res)
-        return res
 
 # =============================================================================
 # 8. QUALITY CONTROL & PERFORMANCE MONITORING
 # =============================================================================
-@dataclass
-class QualityControlPerformanceMonitoringEngineResult:
-    feature_name: str = "Quality Control & Performance Monitoring"
-    status: str = "OPTIMAL"
-    score: float = 0.0
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+class QualityControlPerformanceMonitoringEngine(BaseEnrichmentEngine):
+    """Quality Control & Performance Monitoring: Gravimetric QC tracking with SPC charts for liquid handling performance."""
+    feature_name = "Quality Control & Performance Monitoring"
+    description = "Gravimetric QC tracking with SPC charts for liquid handling performance."
 
-class QualityControlPerformanceMonitoringEngine:
-    """
-    Quality Control & Performance Monitoring: **Description:** Gravimetric QC tracking with SPC charts for liquid handling performance.
-    """
-    def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
-        self.threshold = threshold
-        self.config = config or {}
-        self.history: List[QualityControlPerformanceMonitoringEngineResult] = []
 
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> QualityControlPerformanceMonitoringEngineResult:
-        alerts = []
-        recs = []
-        status = "OPTIMAL"
-        score = round(float(primary_value), 3)
+# =============================================================================
+# BACKWARD-COMPATIBILITY ALIASES (result dataclass names)
+# =============================================================================
+ProtocolOptimizationDeadVolumeMinimizationEngineResult = EnrichmentResult
+AutomatedLabwareDefinitionCustomTipHandlingEngineResult = EnrichmentResult
+TraceabilityAuditTrailIntegrationEngineResult = EnrichmentResult
+ProtocolParallelizationMultiplexingEngineResult = EnrichmentResult
+ErrorRecoveryRobustnessTestingEngineResult = EnrichmentResult
+IntegrationWithLimsSampleManagementEngineResult = EnrichmentResult
+NormalizationDilutionCalculatorResult = EnrichmentResult
+QualityControlPerformanceMonitoringEngineResult = EnrichmentResult
 
-        if primary_value > self.threshold * 2:
-            status = "CRITICAL_ALERT"
-            alerts.append(f"Quality Control & Performance Monitoring: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
-            recs.append("Initiate immediate protocol review and escalate to attending lead.")
-        elif primary_value > self.threshold:
-            status = "WARNING"
-            alerts.append(f"Quality Control & Performance Monitoring: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
-            recs.append("Increase monitoring frequency and perform secondary verification.")
-        else:
-            recs.append("Parameters nominal under standard operating bounds.")
-
-        res = QualityControlPerformanceMonitoringEngineResult(
-            feature_name="Quality Control & Performance Monitoring",
-            status=status,
-            score=score,
-            metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
-            alerts=alerts,
-            recommendations=recs
-        )
-        self.history.append(res)
-        return res
 
 # =============================================================================
 # COMPOSITE ENRICHMENT SUITE
@@ -434,6 +183,7 @@ class OpentronsliquidhandleragentEnrichmentSuite:
         results["NormalizationDilutionCalculator"] = self.normalizationdilutio.evaluate(primary_val, secondary_val)
         results["QualityControlPerformanceMonitoringEngine"] = self.qualitycontrolperfor.evaluate(primary_val, secondary_val)
         return results
+
 
 # Global instance
 enrichment_suite = OpentronsliquidhandleragentEnrichmentSuite()
