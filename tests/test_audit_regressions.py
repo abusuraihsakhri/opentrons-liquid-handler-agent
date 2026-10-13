@@ -93,3 +93,18 @@ def test_supervisor_rejects_phi_in_attributes():
 def test_supervisor_rejects_nan_metrics():
     with pytest.raises(ValueError):
         SystemTaskPayload(task_id="DEMO", target_identifier="S01", primary_metric=math.nan)
+
+def test_audit_log_api_requires_explicit_key(monkeypatch):
+    from fastapi import HTTPException
+    from agents.api import api_audit_logs
+
+    monkeypatch.delenv("AUDIT_LOG_ACCESS_KEY", raising=False)
+    with pytest.raises(HTTPException) as error:
+        api_audit_logs(x_audit_log_key="")
+    assert error.value.status_code == 503
+
+    monkeypatch.setenv("AUDIT_LOG_ACCESS_KEY", "a-test-only-key")
+    with pytest.raises(HTTPException) as error:
+        api_audit_logs(x_audit_log_key="wrong")
+    assert error.value.status_code == 403
+    assert api_audit_logs(x_audit_log_key="a-test-only-key")["verified"] is True
