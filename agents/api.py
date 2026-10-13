@@ -14,7 +14,7 @@ supervisor = SystemSupervisor(model_provider="mock")
 
 app = FastAPI(
     title="Opentrons Liquid Handler Agent API",
-    description="Enterprise Distributed Component Platform (AI Drug Discovery, Structural Biology & Wet-Lab Robotics)",
+    description="Local demonstration API for generic task flagging; not validated robot control",
     version="3.0.0-ENTERPRISE",
 )
 
@@ -25,7 +25,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "service": "opentrons-liquid-handler-agent", "domain": "AI Drug Discovery, Structural Biology & Wet-Lab Robotics", "standard": "wwPDB / IUPAC / OpenSMILES / ISAC Standards", "version": "3.0.0-ENTERPRISE"}
+    return {"status": "HEALTHY", "service": "opentrons-liquid-handler-agent", "domain": "AI Drug Discovery, Structural Biology & Wet-Lab Robotics", "standard": "Non-normative demonstration rules", "version": "3.0.0-ENTERPRISE"}
 
 
 @app.get("/metrics")
