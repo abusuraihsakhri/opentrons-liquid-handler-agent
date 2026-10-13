@@ -21,7 +21,7 @@ class InvariantQCWorker:
                 urgency=UrgencyLevel.ELEVATED,
                 summary="Primary Metric Threshold Exceeded",
                 technical_details=f"Primary measurement ({payload.primary_metric:.2f}) exceeds upper reference limit (25.00) under the non-normative demonstration rule.",
-                actionable_remediation="Initiate recalibration workflow and review secondary parameters.",
+                actionable_remediation="Review the input; the threshold is illustrative and no calibration is performed.",
             ))
         return alerts
 
@@ -37,9 +37,9 @@ class SafetyEscalationWorker:
                 alert_id=f"SAFE-{uuid.uuid4().hex[:6]}",
                 origin_worker="SafetyEscalationWorker",
                 urgency=UrgencyLevel.CRITICAL_STAT if payload.is_critical_flag else UrgencyLevel.ELEVATED,
-                summary="Critical Safety Interlock Triggered",
+                summary="Demonstration Safety Flag Triggered",
                 technical_details=f"CriticalFlag={payload.is_critical_flag} with secondary index {payload.secondary_metric:.2f}.",
-                actionable_remediation="Execute immediate closed-loop escalation and notify attending supervisor.",
+                actionable_remediation="Review flagged inputs; this software does not operate a hardware interlock.",
             ))
         return alerts
 
@@ -56,8 +56,8 @@ class ProtocolConformanceWorker:
                 alert_id=f"CONF-{uuid.uuid4().hex[:6]}",
                 origin_worker="ProtocolConformanceWorker",
                 urgency=UrgencyLevel.ELEVATED,
-                summary="Protocol Conformance Discordance Detected",
+                summary="Descriptor Warning Keyword Matched",
                 technical_details=f"Descriptor '{payload.status_descriptor}' matches a demonstration warning keyword; this does not establish protocol nonconformance.",
-                actionable_remediation="Re-evaluate input specimen or rerun secondary confirmation assay.",
+                actionable_remediation="Review the descriptor using the applicable lab protocol; no conformance testing was performed.",
             ))
         return alerts
