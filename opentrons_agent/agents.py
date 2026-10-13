@@ -93,7 +93,7 @@ class OpentronsCoordinator:
             "critical_count": crit_count,
             "warning_count": warn_count,
             "alerts": [a.to_dict() for a in all_alerts],
-            "standard_specification": "Opentrons Protocol API v2 Specification",
+            "standard_specification": "Generic demonstration thresholds, not a validated Opentrons protocol",
             "consensus_summary": f"Consensus evaluation completed across 3 sub-agents with status [{status.value}].",
         }
 
@@ -105,6 +105,6 @@ class OpentronsCoordinator:
         if "status" in q or "ledger" in q:
             return f"OT-2 Liquid Handler: Python Protocol & Pipetting Accuracy Agent currently managing {len(self.execution_ledger)} execution tasks in air-gapped memory."
         elif "standard" in q or "spec" in q:
-            return "Active runtime operating strictly according to Opentrons Protocol API v2 Specification specifications."
+            return "Opentrons Protocol API v2 Specification is not verified by this demonstration."
         else:
-            return f"OT-2 Liquid Handler: Python Protocol & Pipetting Accuracy Agent executive coordinator online. Zero-telemetry on-premises surveillance active."
+            return f"OT-2 Liquid Handler: Python Protocol & Pipetting Accuracy Agent executive coordinator online. This is an in-memory rule evaluation; no robot telemetry is collected."
