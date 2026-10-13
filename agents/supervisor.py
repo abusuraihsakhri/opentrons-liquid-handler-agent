@@ -78,5 +78,5 @@ class SystemSupervisor:
 
     def query_supervisory_chat(self, query: str) -> str:
         PHIGuard.assert_no_phi(query)
-        prompt = f"Supervisor inquiry for Opentrons Liquid Handler Agent under wwPDB / IUPAC / OpenSMILES / ISAC Standards: {query}"
+        prompt = f"Supervisor inquiry for Opentrons Liquid Handler Agent using demonstration threshold rules: {query}"
         return self.llm.invoke(prompt)
