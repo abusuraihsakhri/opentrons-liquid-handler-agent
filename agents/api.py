@@ -1,10 +1,12 @@
 """
 FastAPI REST API Server for Opentrons Liquid Handler Agent.
 """
+import hmac
+import os
 from typing import Dict, Any, List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
-from .base import AuditLogger, PHIGuard
+from .base import AuditLogger, PHIGuard, SecurityException
 from .models import SystemTaskPayload, ConsensusDossier
 from .supervisor import SystemSupervisor
 
@@ -40,8 +42,10 @@ def api_audit(payload: SystemTaskPayload):
     try:
         dossier = supervisor.process_task(payload)
         return dossier.to_dict()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except SecurityException:
+        raise HTTPException(status_code=422, detail="Sensitive identifiers are not accepted")
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422, detail="Invalid task payload")
 
 
 @app.post("/api/chat")
@@ -49,10 +53,15 @@ def api_chat(req: ChatRequest):
     try:
         ans = supervisor.query_supervisory_chat(req.query)
         return {"response": ans}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except SecurityException:
+        raise HTTPException(status_code=422, detail="Sensitive identifiers are not accepted")
 
 
 @app.get("/api/audit/logs")
-def api_audit_logs():
+def api_audit_logs(x_audit_log_key: str = Header(default="")):
+    expected = os.environ.get("AUDIT_LOG_ACCESS_KEY")
+    if not expected:
+        raise HTTPException(status_code=503, detail="Audit log access is not configured")
+    if not hmac.compare_digest(x_audit_log_key, expected):
+        raise HTTPException(status_code=403, detail="Audit log access denied")
     return {"audit_trail": AuditLogger.get_trail(), "verified": AuditLogger.verify_integrity()}
