@@ -1,6 +1,6 @@
 """
 Enrichment Feature Implementation for opentrons-liquid-handler-agent.
-Generated based on domain-specific requirements in specifications.
+Generic demonstration threshold engines; named features are not full implementations.
 """
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
@@ -94,7 +94,7 @@ class AutomatedLabwareDefinitionCustomTipHandlingEngine(BaseEnrichmentEngine):
 # 3. TRACEABILITY & AUDIT TRAIL INTEGRATION
 # =============================================================================
 class TraceabilityAuditTrailIntegrationEngine(BaseEnrichmentEngine):
-    """Traceability & Audit Trail Integration: 21 CFR Part 11-compliant records for automated liquid handling."""
+    """Traceability & Audit Trail Integration: demonstration threshold flagging only; not Part 11 compliant."""
     feature_name = "Traceability & Audit Trail Integration"
     description = "21 CFR Part 11-compliant records for automated liquid handling."
 

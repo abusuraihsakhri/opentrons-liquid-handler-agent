@@ -1,6 +1,6 @@
 """
 Traceability & Audit Trail Integration for Opentrons Liquid Handler.
-21 CFR Part 11-compliant records with immutable audit trail and data integrity verification.
+Locally hash-chained records and integrity verification; not a Part 11 validation.
 """
 import hashlib
 import json
@@ -40,7 +40,7 @@ class BarcodeRecord:
 
 @dataclass
 class AuditEntry:
-    """Immutable audit trail entry for a single pipetting action."""
+    """Hash-chained record for a single simulated or recorded action."""
     entry_id: str
     action: ActionType
     source_barcode: Optional[str]
@@ -77,6 +77,8 @@ class AuditEntry:
             "operator_id": self.operator_id,
             "protocol_id": self.protocol_id,
             "success": self.success,
+            "liquid_class": self.liquid_class,
+            "error_message": self.error_message,
             "previous_hash": self.previous_hash,
         }
         serialized = json.dumps(hash_data, sort_keys=True).encode("utf-8")
@@ -84,7 +86,7 @@ class AuditEntry:
 
 
 class AuditTrail:
-    """Immutable, hash-chained audit trail for 21 CFR Part 11 compliance."""
+    """In-memory hash chain; not immutable storage or regulatory certification."""
 
     def __init__(self, protocol_id: str, operator_id: str = "SYSTEM"):
         self.protocol_id = protocol_id

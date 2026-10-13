@@ -53,6 +53,8 @@ class NormalizationEngine:
     OPTIMAL_VOLUME_RANGE = (10.0, 150.0)
 
     def __init__(self, dead_volume: float = 5.0):
+        if not math.isfinite(dead_volume) or dead_volume < 0:
+            raise ValueError("dead_volume must be a finite non-negative number")
         self.dead_volume = dead_volume
 
     def calculate_simple_dilution(
@@ -62,8 +64,19 @@ class NormalizationEngine:
         target_volume: float,
     ) -> DilutionStep:
         """Calculate a single dilution step from source to target concentration."""
-        if sample.concentration <= target_concentration:
-            # Sample already at or below target - no dilution needed
+        if not all(math.isfinite(v) for v in (
+            sample.concentration, sample.uncertainty, sample.volume_available,
+            target_concentration, target_volume
+        )):
+            raise ValueError("Concentrations and volumes must be finite")
+        if sample.concentration <= 0 or target_concentration <= 0 or target_volume <= 0:
+            raise ValueError("Concentrations and target volume must be positive")
+        if sample.uncertainty < 0 or sample.volume_available < 0:
+            raise ValueError("Uncertainty and available volume must be non-negative")
+        if sample.concentration < target_concentration:
+            raise ValueError("A lower-concentration stock cannot reach the target by dilution")
+        if sample.concentration == target_concentration:
+            # No dilution needed for an exact concentration match
             return DilutionStep(
                 step_number=1,
                 sample_id=sample.sample_id,
@@ -113,6 +126,12 @@ class NormalizationEngine:
         volume_per_step: float = 100.0,
     ) -> List[DilutionStep]:
         """Generate a serial dilution scheme with well mapping."""
+        if not all(math.isfinite(v) for v in (initial_concentration, dilution_factor, volume_per_step)):
+            raise ValueError("Serial dilution inputs must be finite")
+        if initial_concentration <= 0 or dilution_factor <= 1 or volume_per_step <= 0:
+            raise ValueError("Use positive concentration/volume and dilution factor above 1")
+        if not isinstance(num_steps, int) or not 1 <= num_steps <= 384:
+            raise ValueError("num_steps must be an integer between 1 and 384")
         steps = []
         current_conc = initial_concentration
 
@@ -122,7 +141,7 @@ class NormalizationEngine:
             current_conc = current_conc / dilution_factor
 
             # Map to wells (A1->A2->A3 etc.)
-            source_well = f"A{i + 1}" if i > 0 else "Stock"
+            source_well = f"A{i}" if i > 0 else "Stock"
             dest_well = f"A{i + 1}"
 
             steps.append(DilutionStep(
@@ -153,7 +172,14 @@ class NormalizationEngine:
             unit=samples[0].unit if samples else "ng/uL",
         )
 
-        # Determine well plate layout
+        # Determine well plate layout and reject overflow before indexing.
+        if well_plate_format not in ("96", "384"):
+            raise ValueError("well_plate_format must be '96' or '384'")
+        capacity = int(well_plate_format)
+        if len(samples) > capacity:
+            raise ValueError(f"{len(samples)} samples exceed the {capacity}-well capacity")
+        if samples and not all(sample.unit == samples[0].unit for sample in samples):
+            raise ValueError("All samples must use the same concentration unit")
         rows = "ABCDEFGH" if well_plate_format == "96" else "ABCDEFGHIJKLMNOP"
         cols = 12 if well_plate_format == "96" else 24
 
@@ -200,7 +226,18 @@ class NormalizationEngine:
         stock_concentration: float,
     ) -> Dict[str, Any]:
         """Back-calculate required stock volume and diluent for a target."""
-        if stock_concentration <= target_concentration:
+        if not all(math.isfinite(v) for v in (target_concentration, target_volume, stock_concentration)):
+            raise ValueError("Concentrations and volume must be finite")
+        if min(target_concentration, target_volume, stock_concentration) <= 0:
+            raise ValueError("Concentrations and volume must be positive")
+        if stock_concentration == target_concentration:
+            return {
+                "feasible": True, "direct_dilution": True,
+                "stock_volume_uL": round(target_volume, 2),
+                "diluent_volume_uL": 0.0, "dilution_factor": 1.0,
+                "total_volume_uL": round(target_volume, 2),
+            }
+        if stock_concentration < target_concentration:
             return {
                 "feasible": False,
                 "reason": "Stock concentration is at or below target concentration",

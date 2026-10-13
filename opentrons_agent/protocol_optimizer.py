@@ -77,9 +77,9 @@ class ProtocolOptimizer:
             return {"error": f"Unknown well type: {well_type}",
                     "available_types": list(self.WELL_GEOMETRIES.keys())}
 
+        if not math.isfinite(current_volume) or not 0 <= current_volume <= geo.total_volume:
+            raise ValueError("Current volume must be finite and within the well capacity")
         dead_vol = geo.total_volume * geo.dead_volume_coefficient
-        recoverable = max(0.0, current_volume - dead_vol)
-        recovery_fraction = recoverable / current_volume if current_volume > 0 else 0.0
 
         # Position-dependent correction based on meniscus height
         fill_fraction = current_volume / geo.total_volume
@@ -91,6 +91,8 @@ class ProtocolOptimizer:
             position_penalty = 0.0
 
         effective_dead = dead_vol * (1.0 + position_penalty)
+        recoverable = max(0.0, current_volume - effective_dead)
+        recovery_fraction = recoverable / current_volume if current_volume > 0 else 0.0
 
         return {
             "well_type": well_type,
@@ -111,8 +113,14 @@ class ProtocolOptimizer:
         tip_type: str = "300µL",
     ) -> LiquidClassParams:
         """Optimize liquid class parameters for target volume and liquid properties."""
+        if not math.isfinite(volume) or volume <= 0:
+            raise ValueError("Target volume must be finite and positive")
+        if well_type not in self.WELL_GEOMETRIES:
+            raise ValueError(f"Unknown well type: {well_type}")
         viscosity_factor = self.VISCOSITY_FACTORS.get(viscosity, 1.0)
-        geo = self.WELL_GEOMETRIES.get(well_type, self.WELL_GEOMETRIES["96-flat"])
+        geo = self.WELL_GEOMETRIES[well_type]
+        if volume > geo.total_volume:
+            raise ValueError("Transfer volume exceeds well capacity")
 
         # Scale aspiration speed by volume and viscosity
         base_asp_speed = 100.0  # µL/s
@@ -156,8 +164,22 @@ class ProtocolOptimizer:
         viscosity: str = "aqueous",
         well_type: str = "96-flat",
         n_replicates: int = 1,
+        source_volume_uL: Optional[float] = None,
     ) -> TransferResult:
         """Simulate a liquid transfer and predict accuracy/precision."""
+        if not math.isfinite(target_volume) or target_volume <= 0:
+            raise ValueError("Target volume must be finite and positive")
+        if well_type not in self.WELL_GEOMETRIES:
+            raise ValueError(f"Unknown well type: {well_type}")
+        geo = self.WELL_GEOMETRIES[well_type]
+        if target_volume > geo.total_volume:
+            raise ValueError("Transfer volume exceeds well capacity")
+        if not isinstance(n_replicates, int) or n_replicates < 1:
+            raise ValueError("n_replicates must be a positive integer")
+        if source_volume_uL is None:
+            source_volume_uL = geo.total_volume  # documented full-well assumption
+        if not math.isfinite(source_volume_uL) or not 0 <= source_volume_uL <= geo.total_volume:
+            raise ValueError("Source volume must be finite and within well capacity")
         if liquid_class is None:
             liquid_class = self.optimize_liquid_class(target_volume, viscosity, well_type)
 
@@ -181,7 +203,7 @@ class ProtocolOptimizer:
         precision_cv = base_cv + cv_volume + cv_viscosity
 
         # Dead volume
-        dead_info = self.predict_dead_volume(well_type, 300.0)
+        dead_info = self.predict_dead_volume(well_type, source_volume_uL)
 
         warnings = []
         if target_volume < 5:

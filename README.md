@@ -1,200 +1,89 @@
 # Opentrons Liquid Handler Agent
 
-> **Domain:** Computational Biology & AI Drug Discovery  
-> **Reference Guidelines & Standards:** `wwPDB, IUPAC & CLSI Computational Guidelines`
+Rule-based demonstration of liquid-handling task flags, with separate Python utilities for experimental dilution calculations, well geometry estimates, and in-memory audit records.
 
-<div align="center">
+**Scope:** This repository does **not** connect to or command an Opentrons robot, generate validated Opentrons Protocol API programs, demonstrate calibrated pipetting accuracy, or establish regulatory compliance. The generic warning thresholds are examples, not manufacturer or laboratory acceptance limits.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+## Browser demonstration
 
-</div>
+The `web/` directory contains a static, server-independent interface suitable for GitHub Pages. It evaluates the same **demonstration rules** as `agents/workers.py`:
 
----
+- Primary metric above **25** → elevated warning.
+- Secondary metric above **12** → elevated warning.
+- Explicit critical flag → critical classification.
+- Status descriptor containing DISCORDANT, ANOMALY, MUTANT, VIOLATION, FAIL, or REJECT → elevated warning.
 
-## 📖 What It Does
+The interface supports JSON output and downloading the most recent result. It creates **no HMAC signatures** or real hardware audit records. It does not use a backend, remote API, tracking library, browser storage, or cookies; inputs remain in page memory until reset/reload. Do not enter patient identifiers or sensitive laboratory information.
 
-Opentrons Liquid Handler Agent is an enterprise-grade distributed component platform for computational biology and AI drug discovery. It provides deterministic calculation engines, multi-tier risk classification, and cryptographic audit trails for liquid handling robotics workflows.
+To preview locally, open `web/index.html` in a modern browser, or serve the directory using `python -m http.server` and navigate to `/web/`. The GitHub Pages deployment workflow publishes the contents of `web/` on changes to `master`.
 
----
+## Python setup
 
-## ⚙️ Key Capabilities & Algorithmic Modules
-
-- **Deterministic Calculation Engine**: Strict compliance with standard reference formulations and thresholds.
-- **Risk & Urgency Classification**: Multi-tier categorization with automated clinical/operational action recommendations.
-- **Validation & Guardrails**: Rigorous input bounds checking and anomaly detection.
-- **Multi-Worker Evaluation**: InvariantQC, Safety Escalation, and Protocol Conformance workers.
-- **Enrichment Suite**: Protocol optimization, labware definition, traceability, parallelization, error recovery, LIMS integration, normalization, and QC monitoring.
-
----
-
-## 💻 Installation
+Python 3.9 or newer is required.
 
 ```bash
-# Clone the repository
 git clone https://github.com/abusuraihsakhri/opentrons-liquid-handler-agent.git
 cd opentrons-liquid-handler-agent
-
-# Install dependencies
-pip install fastapi uvicorn pydantic pytest
-
-# Optional: Set audit secret key for persistent audit integrity
-export AUDIT_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m pytest -q
 ```
 
----
+The installed `opentrons-liquid-handler-agent` command uses the root `cli.py` implementation. For backward compatibility, `opentrons-liquid-handler-engine` uses the independent `opentrons_agent/cli.py` implementation.
 
-## 💻 CLI Quickstart & Usage
+### CLI examples
 
-### 1. Run Single Task Evaluation
 ```bash
-python cli.py audit --task-id TASK-001 --target KEY-01 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
-```
-
-### 2. Interactive Chat Query
-```bash
-python cli.py chat "What is the system status?"
-```
-
-### 3. Batch Process CSV Records
-```bash
+python cli.py audit --task-id DEMO-001 --target SAMPLE-A01 --primary 28.5 --secondary 14.2
+python cli.py chat "What are the demonstration rules?"
 python cli.py batch -i sample.csv -o results.csv
-```
-
-### 4. Verify Audit Trail Integrity
-```bash
 python cli.py verify-audit
 ```
 
-### 5. Launch FastAPI REST Server
+The CSV input accepts `task_id`, `target_identifier`, `primary_metric`, `secondary_metric`, `status_descriptor`, and `is_critical_flag` (`true`, `1`, or `yes` for true). Invalid rows are skipped with a warning. Output is a threshold-classification dossier, **not a validated protocol**.
+
+### Calculation modules
+
+- `opentrons_agent.normalization_engine`: mass-balance dilution calculations and serial well mapping, with finite-input and feasibility checks.
+- `opentrons_agent.protocol_optimizer`: heuristic liquid-class and dead-volume estimates; these are not empirically calibrated or guaranteed hardware settings.
+- `opentrons_agent.audit_trail`: in-memory hash-linked action records; these are not immutable storage or 21 CFR Part 11 records.
+- `enrichment.py`: generic threshold evaluations named for possible enhancement areas, **not** complete implementations of LIMS integration, QC charts, error recovery, or labware generation.
+
+## Optional local API
+
 ```bash
+python -m pip install -e ".[server]"
 python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
-### Parameter Reference
-- `--task-id`: Unique task identifier (default: TASK-2026-001)
-- `--target`: Target identifier (default: KEY-TARGET-01)
-- `--primary`: Primary metric value (float, default: 28.5)
-- `--secondary`: Secondary metric value (float, default: 14.2)
-- `--critical`: Flag for critical status (store_true)
-- `--status`: Status descriptor (default: DISCORDANT)
+Endpoints are `/health`, `/metrics` (JSON), `POST /api/audit`, and `POST /api/chat`. The mock chat provider does not invoke an external language model. The in-memory `/api/audit/logs` endpoint is disabled unless `AUDIT_LOG_ACCESS_KEY` is set; when enabled it requires the `X-Audit-Log-Key` header. Set `AUDIT_SECRET_KEY` to a secure, randomly generated value for consistent HMAC signing across restarts. Neither the log records nor the signing state are persisted to a database or disk.
 
-### Input Data Schema (CSV Batch)
+The development API does not provide user authentication for task submission. **Do not expose the service directly to an untrusted network**; run it locally or behind an authenticated gateway, and do not send PHI. Pattern-based identifier screening does not guarantee de-identification.
 
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `task_id` | Unique task identifier | Required |
-| `target_identifier` | Target entity identifier | Required |
-| `primary_metric` | Primary measurement value | Required |
-| `secondary_metric` | Secondary measurement value | Optional |
-| `is_critical_flag` | Critical escalation flag | Optional |
-| `status_descriptor` | Status code descriptor | Optional |
+## Docker
 
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
-### Security Configuration
-
-Set the `AUDIT_SECRET_KEY` environment variable for persistent audit trail integrity:
+Copy `.env.example` to `.env` and set a random `AUDIT_SECRET_KEY` value. Then run:
 
 ```bash
-# Generate a secure key
-python -c "import secrets; print(secrets.token_hex(32))"
-
-# Set in environment
-export AUDIT_SECRET_KEY="your-generated-key"
+docker compose up --build
 ```
 
----
+The compose file publishes port 8000 to **localhost only**. `.dockerignore` keeps local `.env` files and development artifacts out of the image build context.
 
-## 🧪 Testing & Verification
-
-Run the automated test suite:
+## Testing
 
 ```bash
-pytest -v
+python -m pip install -e ".[dev]"
+python -m pytest -q
+node --check web/app.js
+node --test tests/test_web_rules.cjs
 ```
 
-Execute high-throughput batch simulation benchmarks:
+GitHub Actions executes Python tests on 3.10–3.13 and browser-rule tests using Node.js 22. There is no physical-robot integration or wet-lab verification in this test suite.
 
-```bash
-python simulator.py 1000
-```
+## Technology, privacy, and license
 
----
+Python, Pydantic v2, optional FastAPI/Uvicorn, pytest, and dependency-free browser JavaScript. The browser demo is intended for contemporary desktop and mobile browsers. CLI and API task data are held in process memory and should not be treated as secure persistent records.
 
-## 🐳 Container Deployment
-
-### Docker
-```bash
-# Copy environment template
-cp .env.example .env
-# Edit .env and set AUDIT_SECRET_KEY
-
-# Build and run
-docker build -t opentrons-liquid-handler-agent .
-docker run -p 8000:8000 --env-file .env opentrons-liquid-handler-agent
-```
-
-### Docker Compose
-```bash
-# Copy environment template and configure
-cp .env.example .env
-# Edit .env and set AUDIT_SECRET_KEY
-
-# Launch
-docker-compose up -d
-```
-
----
-
-## 📁 Project Structure
-
-```
-opentrons-liquid-handler-agent/
-├── agents/                  # Core agent modules
-│   ├── api.py              # FastAPI REST endpoints
-│   ├── base.py             # Security, PHI guard, audit trail
-│   ├── models.py           # Pydantic data models
-│   ├── supervisor.py       # Supervisor orchestrator
-│   ├── workers.py          # Specialized worker agents
-│   ├── llm_factory.py      # LLM provider factory
-│   ├── learning.py         # Bayesian calibration engine
-│   ├── metrics.py          # Prometheus metrics collector
-│   └── streamer.py         # WebSocket telemetry broadcaster
-├── opentrons_agent/        # Frontier agent modules
-│   ├── agents.py           # Sub-agent implementations
-│   ├── engine.py           # Core algorithmic engine
-│   ├── models.py           # Data models
-│   ├── cli.py              # Frontier CLI
-│   ├── server.py           # Frontier FastAPI server
-│   ├── audit_trail.py      # 21 CFR Part 11 audit trail
-│   ├── normalization_engine.py  # Dilution calculator
-│   └── protocol_optimizer.py    # Protocol optimization
-├── tests/                  # Test suite
-├── web/                    # Web operations console
-├── cli.py                  # Main CLI entry point
-├── simulator.py            # High-throughput simulator
-├── enrichment.py           # Enrichment feature suite
-├── pyproject.toml          # Project configuration
-├── Dockerfile              # Docker build config
-├── docker-compose.yml      # Docker Compose config
-└── .env.example            # Environment template
-```
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Licensed under the [MIT License](LICENSE).

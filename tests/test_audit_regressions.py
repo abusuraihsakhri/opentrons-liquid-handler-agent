@@ -1,0 +1,132 @@
+"""Regression checks for audit authenticity, numerical feasibility and data protection."""
+import math
+import pytest
+
+from agents.base import AuditTrail, SecurityException
+from agents.models import SystemTaskPayload
+from agents.supervisor import SystemSupervisor
+from opentrons_agent.audit_trail import ActionType, AuditTrail as PipettingAuditTrail
+from opentrons_agent.normalization_engine import NormalizationEngine, SampleConcentration
+
+
+def test_audit_detects_field_tampering():
+    trail = AuditTrail(secret_key="unit-test-secret")
+    trail.log("operator", "supervisor", "PROCESS", {"status": "SUCCESS"})
+    trail.log("operator", "supervisor", "PROCESS", {"status": "SUCCESS"})
+    assert trail.verify_integrity()
+    trail.logs[0]["event_type"] = "ALTERED"
+    assert not trail.verify_integrity()
+
+
+def test_audit_readers_receive_copies():
+    trail = AuditTrail(secret_key="unit-test-secret")
+    trail.log("operator", "supervisor", "PROCESS", {"status": "SUCCESS"})
+    snapshot = trail.get_trail()
+    snapshot[0]["event_type"] = "ALTERED"
+    assert trail.verify_integrity()
+
+
+def test_audit_blocks_phi_in_actor():
+    trail = AuditTrail(secret_key="unit-test-secret")
+    with pytest.raises(SecurityException):
+        trail.log("Patient John Doe", "supervisor", "PROCESS", {"status": "SUCCESS"})
+
+
+def test_pipetting_hash_covers_error_and_liquid_class():
+    trail = PipettingAuditTrail("DEMO")
+    entry = trail.log_action(ActionType.DISPENSE, 10.0, liquid_class="aqueous")
+    assert trail.verify_chain_integrity()["status"] == "VALID"
+    entry.liquid_class = "modified"
+    assert trail.verify_chain_integrity()["status"] == "COMPROMISED"
+
+
+def test_pipetting_hash_covers_error_message():
+    trail = PipettingAuditTrail("DEMO")
+    entry = trail.log_action(ActionType.ERROR, 0.0, error_message="original")
+    entry.error_message = "changed"
+    assert trail.verify_chain_integrity()["status"] == "COMPROMISED"
+
+
+def test_serial_dilution_source_tracks_previous_well():
+    engine = NormalizationEngine()
+    steps = engine.calculate_serial_dilution(100.0, 10.0, 3)
+    assert [(s.source_well, s.destination_well) for s in steps] == [
+        ("Stock", "A1"), ("A1", "A2"), ("A2", "A3")
+    ]
+
+
+def test_dilution_cannot_concentrate_sample():
+    engine = NormalizationEngine()
+    sample = SampleConcentration("S1", concentration=5.0)
+    with pytest.raises(ValueError, match="cannot reach"):
+        engine.calculate_simple_dilution(sample, 10.0, 100.0)
+
+
+def test_matching_concentrations_require_no_diluent():
+    engine = NormalizationEngine()
+    result = engine.back_calculate_from_target(10.0, 50.0, 10.0)
+    assert result["feasible"] is True
+    assert result["stock_volume_uL"] == 50.0
+    assert result["diluent_volume_uL"] == 0.0
+
+
+def test_plate_bounds_and_nonfinite_inputs():
+    engine = NormalizationEngine()
+    sample = SampleConcentration("S1", concentration=20.0)
+    with pytest.raises(ValueError, match="capacity"):
+        engine.normalize_samples([sample] * 97, 10.0, 100.0)
+    with pytest.raises(ValueError):
+        engine.calculate_serial_dilution(10.0, 1.0, 3)
+    with pytest.raises(ValueError):
+        engine.calculate_simple_dilution(sample, math.nan, 100.0)
+
+
+def test_supervisor_rejects_phi_in_attributes():
+    payload = SystemTaskPayload(
+        task_id="DEMO", target_identifier="S01",
+        primary_metric=12.0, attributes={"contact": "john@example.com"},
+    )
+    with pytest.raises(SecurityException):
+        SystemSupervisor().process_task(payload)
+
+
+def test_supervisor_rejects_nan_metrics():
+    with pytest.raises(ValueError):
+        SystemTaskPayload(task_id="DEMO", target_identifier="S01", primary_metric=math.nan)
+
+def test_audit_log_api_requires_explicit_key(monkeypatch):
+    from fastapi import HTTPException
+    from agents.api import api_audit_logs
+
+    monkeypatch.delenv("AUDIT_LOG_ACCESS_KEY", raising=False)
+    with pytest.raises(HTTPException) as error:
+        api_audit_logs(x_audit_log_key="")
+    assert error.value.status_code == 503
+
+    monkeypatch.setenv("AUDIT_LOG_ACCESS_KEY", "a-test-only-key")
+    with pytest.raises(HTTPException) as error:
+        api_audit_logs(x_audit_log_key="wrong")
+    assert error.value.status_code == 403
+    assert api_audit_logs(x_audit_log_key="a-test-only-key")["verified"] is True
+
+def test_optimizer_recoverable_volume_accounts_for_effective_dead_volume():
+    from opentrons_agent.protocol_optimizer import ProtocolOptimizer
+    optimizer = ProtocolOptimizer()
+    result = optimizer.predict_dead_volume("96-flat", 20.0)
+    assert result["recoverable_volume_uL"] <= 20.0 - result["theoretical_dead_volume_uL"]
+    assert result["recoverable_volume_uL"] >= 0
+    with pytest.raises(ValueError):
+        optimizer.predict_dead_volume("384-flat", 300.0)
+
+
+def test_optimizer_rejects_impossible_transfers_and_assumptions():
+    from opentrons_agent.protocol_optimizer import ProtocolOptimizer
+    optimizer = ProtocolOptimizer()
+    with pytest.raises(ValueError):
+        optimizer.simulate_transfer(300.0, well_type="384-flat")
+    with pytest.raises(ValueError):
+        optimizer.simulate_transfer(10.0, well_type="96-flat", source_volume_uL=-1)
+    with pytest.raises(ValueError):
+        optimizer.optimize_liquid_class(float("inf"))
+    result = optimizer.simulate_transfer(10.0, well_type="384-flat")
+    assert result.dead_volume_remaining <= 80.0

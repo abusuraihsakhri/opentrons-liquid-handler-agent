@@ -1,27 +1,37 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "opentrons-liquid-handler-engine"
-version = "2.0.0"
-description = "OT-2 Liquid Handler: Python Protocol & Pipetting Accuracy Engine"
+version = "2.0.1"
+description = "Rule-based evaluation and experimental liquid-handling calculation utilities"
 readme = "README.md"
-authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
+authors = [{ name = "Dr. Abu Suraih Sakhri" }]
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Topic :: Security/Cryptography",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering",
 ]
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["pydantic>=2,<3"]
+
+[project.optional-dependencies]
+server = ["fastapi>=0.110,<1", "uvicorn>=0.29,<1"]
+dev = ["pytest>=8,<10", "fastapi>=0.110,<1", "uvicorn>=0.29,<1"]
 
 [project.scripts]
+opentrons-liquid-handler-agent = "cli:main"
 opentrons-liquid-handler-engine = "opentrons_agent.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/abusuraihsakhri/opentrons-liquid-handler-engine"
-Repository = "https://github.com/abusuraihsakhri/opentrons-liquid-handler-engine.git"
+Homepage = "https://github.com/abusuraihsakhri/opentrons-liquid-handler-agent"
+Repository = "https://github.com/abusuraihsakhri/opentrons-liquid-handler-agent.git"
+
+[tool.setuptools]
+py-modules = ["cli", "enrichment", "simulator", "opentrons_agent_app"]
+
+[tool.setuptools.packages.find]
+include = ["agents*", "opentrons_agent*"]
