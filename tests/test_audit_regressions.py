@@ -108,3 +108,25 @@ def test_audit_log_api_requires_explicit_key(monkeypatch):
         api_audit_logs(x_audit_log_key="wrong")
     assert error.value.status_code == 403
     assert api_audit_logs(x_audit_log_key="a-test-only-key")["verified"] is True
+
+def test_optimizer_recoverable_volume_accounts_for_effective_dead_volume():
+    from opentrons_agent.protocol_optimizer import ProtocolOptimizer
+    optimizer = ProtocolOptimizer()
+    result = optimizer.predict_dead_volume("96-flat", 20.0)
+    assert result["recoverable_volume_uL"] <= 20.0 - result["theoretical_dead_volume_uL"]
+    assert result["recoverable_volume_uL"] >= 0
+    with pytest.raises(ValueError):
+        optimizer.predict_dead_volume("384-flat", 300.0)
+
+
+def test_optimizer_rejects_impossible_transfers_and_assumptions():
+    from opentrons_agent.protocol_optimizer import ProtocolOptimizer
+    optimizer = ProtocolOptimizer()
+    with pytest.raises(ValueError):
+        optimizer.simulate_transfer(300.0, well_type="384-flat")
+    with pytest.raises(ValueError):
+        optimizer.simulate_transfer(10.0, well_type="96-flat", source_volume_uL=-1)
+    with pytest.raises(ValueError):
+        optimizer.optimize_liquid_class(float("inf"))
+    result = optimizer.simulate_transfer(10.0, well_type="384-flat")
+    assert result.dead_volume_remaining <= 80.0
