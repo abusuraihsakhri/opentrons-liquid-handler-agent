@@ -1,5 +1,5 @@
 """
-Inference Engine supporting local Ollama, Claude, OpenAI, and deterministic Mock with Zero-PHI checks.
+Deterministic local mock reply provider with identifier screening; no external inference.
 """
 from typing import Dict, Any, Optional
 from .base import PHIGuard
